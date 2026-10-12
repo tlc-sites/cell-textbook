@@ -103,6 +103,15 @@ textarea{
 
 .check{display:flex;align-items:center;gap:12px;min-height:52px;font-size:17px}
 .check input{width:26px;height:26px;accent-color:var(--accent)}
+.note-box{display:none;margin:0 0 12px;padding:12px 14px;border-radius:12px;background:var(--bg)}
+.note-box.show{display:block}
+.note-box .hint{display:block;color:var(--sub);font-size:15px;margin-bottom:8px}
+.note-row{display:flex;align-items:center;gap:10px;padding:6px 0}
+.note-row .nq{font-weight:700;min-width:44px;font-size:17px}
+.note-row input{width:96px;min-height:50px;padding:8px 10px;border-radius:12px;border:2px solid var(--line);background:#fff;font-size:18px;text-align:center}
+.note-row input:focus{border-color:#C9853F;outline:none}
+.note-row .nu{font-size:17px}
+.note-row .na{font-size:15px;color:var(--sub)}
 
 .gk-need{display:none;background:#FFF4D9;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:16px}
 .gk-need.show{display:block}
@@ -420,6 +429,10 @@ details.help code{background:#fff;padding:1px 6px;border-radius:6px;font-family:
         <textarea id="fBody" placeholder="위의 '목사님 아웃라인 붙여 넣기'를 누르시거나, 여기에 직접 써 주세요.&#10;&#10;Q1 구하라 그리하면 너희에게 주실 것이요&#10;예수님께서는 확실한 약속과 함께…&#10;“모든 일에 기도와 간구로 … 하나님께 아뢰라.” 빌립보서 4:6."></textarea>
       </div>
       <label class="check"><input type="checkbox" id="fLines" checked> 질문 아래 필기 줄 넣기</label>
+      <div class="note-box" id="noteBox">
+        <span class="hint">질문마다 필기 줄을 몇 줄 넣을지 정할 수 있습니다. 비워 두시면 쪽에 맞춰 자동으로 넣습니다.</span>
+        <div class="note-list" id="noteList"></div>
+      </div>
       <div class="row">
         <button type="button" class="btn" id="btnCheck" style="flex:1">오탈자 검사</button>
         <button type="button" class="btn" id="btnCopyCheck" style="flex:1">Claude 검사용 복사</button>
@@ -983,37 +996,42 @@ function makeBanner(doc){
 function render(){
   applyFontVars();
   var r=layout(null);
-  // 최대 쪽수를 넘거나, 필기 줄이 너무 적은 소제목이 있으면:
+  // 직접 정하지 않은 소제목 중 필기 줄이 너무 적은 곳이 있거나 쪽수를 넘으면:
   // 일부 소제목을 새 쪽으로 넘기지 않고 이어 붙여서 필기 줄을 고르게 나눔
-  if(state.lines&&r.secs>1&&(r.pages>MAX_PAGES||minLines(r)<NOTE_GOOD)) fitNotes(r);
+  if(state.lines&&r.auto.length&&(r.pages>MAX_PAGES||minLines(r)<NOTE_GOOD)) r=fitNotes(r);
+  lastLayout=r;
   var label=state.lang==='ko'?'주님의 교회 셀 교재 — ':'The Lord\u2019s Church Cell Textbook _ ';
   var foots=pagesEl.querySelectorAll('.foot');
   for(var i=0;i<foots.length;i++) foots[i].textContent=label+(i+1);
   updateCount(foots.length);
+  renderNoteBox();
   renderGreekPanel();
   renderCheckPanel();
   fitScale();
 }
-function minLines(r){return r.lines.length?Math.min.apply(null,r.lines):0;}
+var lastLayout=null;
+/* 직접 정하지 않은 소제목들의 필기 줄 중 가장 적은 수 */
+function minLines(r){return r.autoLines.length?Math.min.apply(null,r.autoLines):99;}
 var fitCache={key:'',plan:null};
 function fitNotes(base){
-  var secs=base.secs;
   // 같은 내용이면 지난번에 찾은 방법을 그대로 씀
   var key=JSON.stringify([state.lang,state.docs[state.lang],state.fonts]);
-  if(fitCache.key===key){if(fitCache.plan) layout(fitCache.plan);else layout(null);return;}
+  if(fitCache.key===key) return layout(fitCache.plan);
   // 쪽수는 6쪽을 넘지 않고, 원래 쪽수보다 늘지 않게
   var limit=Math.min(MAX_PAGES,base.pages);
   // 점수: 필기 줄이 가장 적은 소제목의 줄 수를 먼저 보고, 같으면 전체 줄 수를 봄
-  function score(r){return minLines(r)*1000+r.lines.reduce(function(a,b){return a+b;},0);}
+  function score(r){return minLines(r)*1000+r.autoLines.reduce(function(a,b){return a+b;},0);}
   var best=base.pages<=MAX_PAGES?{plan:null,r:base}:null;
-  for(var size=1;size<secs;size++){
-    combos(secs-1,size).forEach(function(c){
-      var flow={};c.forEach(function(i){flow[i+1]=true;});
+  var cand=base.auto; // 다음 소제목을 이어 붙일 수 있는 소제목들 (직접 정한 곳 제외)
+  for(var size=1;size<=cand.length;size++){
+    combos(cand.length,size).forEach(function(c){
+      var pick=c.map(function(i){return cand[i];});
+      function planOf(k){var l={};pick.forEach(function(si){l[si]=k;});return {lines:l};}
       // 줄 수를 3줄씩 늘려 가며 대강 찾고, 가장 좋았던 곳 주변을 한 줄씩 다시 봄
       var top=null,tried={};
       function test(k){
         if(k<NOTE_MIN||k>NOTE_MAX||tried[k]) return null;
-        var r=layout({flow:flow,k:k});tried[k]=r;
+        var r=layout(planOf(k));tried[k]=r;
         if(r.pages>limit) return r;
         if(!top||score(r)>score(top.r)) top={k:k,r:r};
         return r;
@@ -1021,13 +1039,13 @@ function fitNotes(base){
       var over=0;
       for(var k=NOTE_MIN;k<=NOTE_MAX&&over<2;k+=3){var r=test(k);over=r.pages>limit?over+1:0;}
       if(top){var c0=top.k;for(var d=-2;d<=2;d++) test(c0+d);}
-      if(top&&(!best||score(top.r)>score(best.r))) best={plan:{flow:flow,k:top.k},r:top.r};
+      if(top&&(!best||score(top.r)>score(best.r))) best={plan:planOf(top.k),r:top.r};
     });
   }
   // 어떻게 해도 넘치면 모두 이어 붙이고 필기 줄을 가장 적게
-  if(!best){var all={};for(var i=1;i<secs;i++) all[i]=true;best={plan:{flow:all,k:NOTE_MIN}};}
+  if(!best){var l={};cand.forEach(function(si){l[si]=NOTE_MIN;});best={plan:{lines:l}};}
   fitCache={key:key,plan:best.plan};
-  layout(best.plan);
+  return layout(best.plan);
 }
 /* n개 중 size개를 고르는 모든 경우 */
 function combos(n,size){
@@ -1039,11 +1057,18 @@ function combos(n,size){
   return out;
 }
 /* plan: null = 소제목마다 새 쪽 + 남은 자리를 필기 줄로 채움
-         {flow, k} = flow[i]가 true인 소제목(i번째)은 새 쪽으로 넘기지 않고 이어 붙이며,
-                     그 앞 소제목의 필기 줄은 k줄까지만 넣음 */
+         {lines:{i:k}} = i번째 소제목 아래에 필기 줄을 k줄 넣고, 다음 소제목을 새 쪽으로 넘기지 않고 이어 붙임
+   교재에서 소제목별로 직접 정한 줄 수(doc.notes)가 있으면 그것이 먼저 */
 function layout(plan){
   var doc=state.docs[state.lang];
-  var flow=(plan&&plan.flow)||{},secLines=[],numSecs=0;
+  var notes=doc.notes||{},secLines=[],autoLines=[],auto=[];
+  function manual(sec){var v=sec&&sec.num?notes[sec.num]:null;return (v===''||v==null||isNaN(+v))?null:Math.max(0,Math.min(60,Math.round(+v)));}
+  function countOf(i){
+    if(!state.lines) return null;
+    var sec=sections[i];if(!sec||!sec.num) return null;
+    var m=manual(sec);if(m!=null) return m;
+    return plan&&plan.lines&&plan.lines[i]!=null?plan.lines[i]:null;
+  }
   unknownGreek={};
   var pending={};(state.check[state.lang]||[]).forEach(function(r){pending[normRef(r)]=true;});
   pagesEl.innerHTML='';
@@ -1070,7 +1095,7 @@ function layout(plan){
   sections.forEach(function(sec,si){
     var head=null;
     if(sec.num){
-      var flows=!!flow[si];
+      var flows=si>0&&countOf(si-1)!=null;
       if(hasBody&&!flows) newPage();
       head=document.createElement('div');head.className='qh'+(flows&&hasBody?' flow':'');
       head.innerHTML='<span class="q">Q'+esc(sec.num)+'</span><span class="t">'+toHTML(tokenize(inline(sec.title)))+'</span>';
@@ -1109,18 +1134,22 @@ function layout(plan){
         for(var i=0;i<cnt;i++) box.appendChild(document.createElement('div'));
         content.appendChild(box);hasBody=true;
       };
-      if(flow[si+1]){
-        // 다음 소제목이 이어 붙는 경우: 필기 줄을 k줄 넣고, 쪽 끝에서 모자라면 다음 쪽 위로 이어서 넣음
-        var here=Math.max(0,Math.min(n,plan.k));
+      var isManual=manual(sec)!=null;
+      if(!isManual&&si<sections.length-1) auto.push(si);
+      var c=countOf(si),got;
+      if(c!=null){
+        // 줄 수가 정해진 경우: 그 수만큼 넣고, 쪽 끝에서 모자라면 다음 쪽 위로 이어서 넣음
+        var here=Math.max(0,Math.min(n,c));
         if(here>0) addLines(here);
-        if(plan.k>here){newPage();addLines(plan.k-here);}
-        secLines.push(plan.k);return;
-      }
-      if(n<1){secLines.push(0);return;} // 필기 줄 때문에 쪽을 늘리지 않음
-      addLines(n);secLines.push(n);
+        if(c>here){newPage();addLines(c-here);}
+        got=c;
+      } else if(n<1) got=0; // 필기 줄 때문에 쪽을 늘리지 않음
+      else {addLines(n);got=n;}
+      secLines.push({num:sec.num,lines:got,manual:isManual});
+      if(!isManual) autoLines.push(got);
     }
   });
-  return {pages:pagesEl.querySelectorAll('.page').length,lines:secLines,secs:sections.length};
+  return {pages:pagesEl.querySelectorAll('.page').length,secs:secLines,autoLines:autoLines,auto:auto};
 }
 function updateCount(n){
   pageTotal=n;
@@ -1284,6 +1313,37 @@ fRef.addEventListener('input',function(){state.docs[state.lang].ref=fRef.value;s
 fBody.addEventListener('input',function(){state.docs[state.lang].body=fBody.value;schedule();});
 fDate.addEventListener('change',function(){state.date=fDate.value;schedule();});
 fLines.addEventListener('change',function(){state.lines=fLines.checked;schedule();});
+/* 질문마다 필기 줄 수 정하기 */
+function renderNoteBox(){
+  var box=$('noteBox'),list=$('noteList'),r=lastLayout;
+  var secs=(r&&r.secs)||[];
+  box.classList.toggle('show',state.lines&&secs.length>0);
+  var notes=state.docs[state.lang].notes||{};
+  var sig=secs.map(function(x){return x.num;}).join(',');
+  if(list.dataset.sig!==sig){
+    list.dataset.sig=sig;
+    list.innerHTML=secs.map(function(x){
+      return '<label class="note-row"><span class="nq">Q'+esc(x.num)+'</span>'+
+        '<input type="number" inputmode="numeric" min="0" max="60" data-num="'+esc(x.num)+'" aria-label="Q'+esc(x.num)+' 필기 줄 수">'+
+        '<span class="nu">줄</span><span class="na"></span></label>';
+    }).join('');
+  }
+  secs.forEach(function(x,i){
+    var row=list.children[i];if(!row) return;
+    var inp=row.querySelector('input'),na=row.querySelector('.na');
+    var v=notes[x.num];
+    if(document.activeElement!==inp) inp.value=(v==null?'':v);
+    inp.placeholder='자동';
+    na.textContent=x.manual?'':'(지금 '+x.lines+'줄)';
+  });
+}
+$('noteList').addEventListener('input',function(e){
+  var inp=e.target;if(!inp.dataset||!inp.dataset.num) return;
+  var d=state.docs[state.lang];d.notes=Object.assign({},d.notes||{});
+  var v=inp.value.trim();
+  if(v==='') delete d.notes[inp.dataset.num]; else d.notes[inp.dataset.num]=Math.max(0,Math.min(60,parseInt(v,10)||0));
+  schedule();
+});
 document.querySelectorAll('#langSeg button').forEach(function(b){
   b.addEventListener('click',function(){state.lang=b.dataset.lang;loadFields();render();save();});
 });
