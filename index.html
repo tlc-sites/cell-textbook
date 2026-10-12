@@ -235,17 +235,18 @@ details.help code{background:#fff;padding:1px 6px;border-radius:6px;font-family:
   width:794px;height:1123px;position:relative;overflow:hidden;background:#fff;color:#221E1B;font-synthesis:style;
   transform:scale(var(--s));transform-origin:0 0;box-shadow:0 2px 10px rgba(60,40,20,.16);
 }
-.page .content{position:absolute;left:95px;right:95px;top:76px;height:986px}
+/* 교회 셀 교재 규격 (A4): 표지 2~5.5cm, 본문 7.5~28cm */
+.page .content{position:absolute;left:95px;right:95px;top:75.6px;height:982.7px}
 .page .foot{position:absolute;left:0;right:0;bottom:34px;text-align:center;font-weight:var(--w-foot);font-size:var(--s-foot);font-family:var(--f-foot),sans-serif;color:#A19A92;letter-spacing:.02em}
-/* 양면 인쇄 타공 자리: 앞면(홀수 쪽)은 오른쪽으로, 뒷면(짝수 쪽)은 왼쪽으로 1cm(38px) 밀어
-   구멍 뚫는 쪽 여백을 넓힘. 글 폭은 그대로라 쪽 나누기는 바뀌지 않음 */
-.page-holder:nth-child(odd) .page .content{left:133px;right:57px}
-.page-holder:nth-child(even) .page .content{left:57px;right:133px}
-.page-holder:nth-child(odd) .page .foot{left:76px;right:0}
-.page-holder:nth-child(even) .page .foot{left:0;right:76px}
+/* 양면 인쇄 타공 자리 (A4 210mm = 794px, 1cm ≈ 37.8px)
+   홀수 쪽: 왼쪽 2.5cm ~ 19cm / 짝수 쪽: 왼쪽 2cm ~ 18.5cm (구멍 뚫는 쪽 여백이 항상 2.5cm) */
+.page-holder:nth-child(odd) .page .content{left:94.5px;right:75.6px}
+.page-holder:nth-child(even) .page .content{left:75.6px;right:94.5px}
+.page-holder:nth-child(odd) .page .foot{left:18.9px;right:0}
+.page-holder:nth-child(even) .page .foot{left:0;right:18.9px}
 
 /* 표지 띠 */
-.banner{height:138px;position:relative;overflow:hidden;margin-bottom:88px;
+.banner{height:132.3px;position:relative;overflow:hidden;margin-bottom:75.6px;
   background:linear-gradient(100deg,#C6B19C 0%,#E2D2C0 42%,#ECE0D1 68%,#D5BEA7 100%)}
 .banner .glow{position:absolute;inset:0;background:radial-gradient(circle at 80% 58%,rgba(255,252,242,1) 0,rgba(255,238,210,.7) 12%,rgba(255,238,210,0) 36%)}
 .banner img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
@@ -989,7 +990,7 @@ function parse(body){
 }
 
 /* ===================== 쪽 나누기 ===================== */
-var H=986,LINE=26,RULE=30,NOTE_MAX=30,NOTE_MIN=3,NOTE_GOOD=8,pagesEl=$('pages'),pageTotal=1;
+var H=982.7,LINE=26,RULE=30,NOTE_MAX=30,NOTE_MIN=3,NOTE_GOOD=8,pagesEl=$('pages'),pageTotal=1;
 function makeBanner(doc){
   var b=document.createElement('div');b.className='banner';
   var title=doc.title||(state.lang==='ko'?'교재 제목':'Title');
