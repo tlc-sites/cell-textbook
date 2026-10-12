@@ -237,6 +237,12 @@ details.help code{background:#fff;padding:1px 6px;border-radius:6px;font-family:
 }
 .page .content{position:absolute;left:95px;right:95px;top:76px;height:986px}
 .page .foot{position:absolute;left:0;right:0;bottom:34px;text-align:center;font-weight:var(--w-foot);font-size:var(--s-foot);font-family:var(--f-foot),sans-serif;color:#A19A92;letter-spacing:.02em}
+/* 양면 인쇄 타공 자리: 앞면(홀수 쪽)은 오른쪽으로, 뒷면(짝수 쪽)은 왼쪽으로 1cm(38px) 밀어
+   구멍 뚫는 쪽 여백을 넓힘. 글 폭은 그대로라 쪽 나누기는 바뀌지 않음 */
+.page-holder:nth-child(odd) .page .content{left:133px;right:57px}
+.page-holder:nth-child(even) .page .content{left:57px;right:133px}
+.page-holder:nth-child(odd) .page .foot{left:76px;right:0}
+.page-holder:nth-child(even) .page .foot{left:0;right:76px}
 
 /* 표지 띠 */
 .banner{height:138px;position:relative;overflow:hidden;margin-bottom:88px;
