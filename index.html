@@ -252,6 +252,7 @@ details.help code{background:#fff;padding:1px 6px;border-radius:6px;font-family:
 .p.cont{text-indent:0}
 .p.split{text-align-last:justify}
 .quote{font-weight:var(--w-quote);font-size:var(--s-quote);line-height:calc(var(--s-quote) * 1.77);font-family:var(--f-quote),serif;border-left:6px solid var(--c-bar);padding:0 0 0 16px;margin:0 0 22px;text-align:justify}
+.quote.split{text-align-last:justify;margin-bottom:0}
 .lang-en .p,.lang-en .quote{word-break:normal}
 
 .em{font-style:italic;color:inherit;background:linear-gradient(transparent 34%,var(--c-mark) 34%,var(--c-mark) 70%,transparent 70%)}
@@ -1022,13 +1023,13 @@ function render(){
         var fresh=!hasBody;
         fill(rest,false);content.appendChild(el);
         if(fits(el)){hasBody=true;head=null;rest=[];break;}
-        if(bl.type==='para'){
-          var lo=1,hi=rest.length-1,best=0;
-          while(lo<=hi){var mid=(lo+hi)>>1;fill(rest.slice(0,mid),true);if(fits(el)){best=mid;lo=mid+1;}else hi=mid-1;}
-          if(best>0){
-            fill(rest.slice(0,best),true);
-            if(el.offsetHeight>=LINE*2-2){rest=rest.slice(best);cont=true;hasBody=true;head=null;newPage();continue;}
-          }
+        // 문단과 말씀 인용 모두, 남은 자리에 두 줄 이상 들어가면 이어서 다음 쪽으로 넘김
+        var lh=bl.type==='para'?LINE:(parseFloat(getComputedStyle(el).lineHeight)||LINE);
+        var lo=1,hi=rest.length-1,best=0;
+        while(lo<=hi){var mid=(lo+hi)>>1;fill(rest.slice(0,mid),true);if(fits(el)){best=mid;lo=mid+1;}else hi=mid-1;}
+        if(best>0){
+          fill(rest.slice(0,best),true);
+          if(el.offsetHeight>=lh*2-2){rest=rest.slice(best);cont=true;hasBody=true;head=null;newPage();continue;}
         }
         if(fresh&&bl.type!=='para'){hasBody=true;rest=[];break;}
         content.removeChild(el);
