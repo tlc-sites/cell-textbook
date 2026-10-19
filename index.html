@@ -190,8 +190,6 @@ details.help code{background:#fff;padding:1px 6px;border-radius:6px;font-family:
 .book-row input{flex:1;min-width:160px}
 .status{color:var(--ok);font-size:15px;min-height:24px;margin-top:6px}
 .status.warn{color:#A33A2A}
-.arch-steps{margin:0 0 10px;padding-left:22px;font-size:16px}
-.arch-steps li{margin-bottom:6px}
 .arch-dest{margin:0 0 12px;padding:10px 12px;border-radius:12px;background:var(--bg);font-size:16px;word-break:keep-all}
 .arch-dest b{word-break:break-all}
 .status a{color:inherit;font-weight:700}
@@ -221,6 +219,15 @@ details.help code{background:#fff;padding:1px 6px;border-radius:6px;font-family:
   display:flex;gap:10px;
 }
 .bottom-bar .btn{flex:1;min-height:58px;font-size:19px;font-weight:700}
+.bottom-bar.two .btn{font-size:16px;line-height:1.25;padding:6px 10px;word-break:keep-all}
+#btnArchive{background:var(--ink);border-color:var(--ink)}
+#btnArchive:disabled{opacity:.7;cursor:wait}
+/* 드라이브용 PDF를 만들 때 쓰는 화면 밖 작업 공간 */
+#capture{position:fixed;left:0;top:0;width:794px;z-index:-1;pointer-events:none;--s:1}
+#capture .page-holder{width:794px;height:1123px;margin:0}
+#capture .page{transform:none;box-shadow:none}
+#capture .quote.needcheck{outline:none}
+#capture .quote.needcheck::after{display:none}
 .pc{min-width:104px;border-radius:12px;background:#fff;border:2px solid var(--line);display:flex;flex-direction:column;justify-content:center;align-items:center;line-height:1.25;padding:4px 10px}
 .pc b{font-size:19px}
 .pc span{font-size:14px;color:var(--sub)}
@@ -497,13 +504,8 @@ details.help code{background:#fff;padding:1px 6px;border-radius:6px;font-family:
 
     <div class="panel" id="archivePanel" style="display:none">
       <h2>완성본 드라이브에 보관하기</h2>
-      <ol class="arch-steps">
-        <li>아래 <b>인쇄하거나 PDF로 저장</b>을 눌러 <b>PDF로 저장</b>합니다. 파일 이름은 자동으로 정해져 있어요.</li>
-        <li>저장한 PDF를 아래 버튼으로 골라 주세요.</li>
-      </ol>
       <p class="arch-dest" id="archDest"></p>
-      <label class="btn primary wide" for="fArchive" style="display:flex;align-items:center;justify-content:center">저장한 PDF 골라서 드라이브에 올리기</label>
-      <input type="file" id="fArchive" accept="application/pdf,.pdf" hidden>
+      <span class="hint" style="display:block;color:var(--sub);font-size:15px">아래 <b>PDF로 드라이브에 저장</b>을 누르면 교재를 PDF로 만들어 바로 보관합니다. 같은 날짜 파일이 있으면 새 파일로 바뀝니다.</span>
       <div class="status" id="archStatus" aria-live="polite"></div>
     </div>
   </section>
@@ -560,7 +562,8 @@ details.help code{background:#fff;padding:1px 6px;border-radius:6px;font-family:
 
 <div class="bottom-bar">
   <div class="pc" id="pageCount" aria-live="polite"><b>1쪽</b><span>최대 6쪽</span></div>
-  <button type="button" class="btn primary" id="btnPrint">인쇄하거나 PDF로 저장</button>
+  <button type="button" class="btn primary" id="btnPrint">인쇄용 PDF 생성</button>
+  <button type="button" class="btn primary" id="btnArchive" style="display:none">PDF로 드라이브에 저장</button>
 </div>
 
 <script>
@@ -1767,7 +1770,6 @@ $('btnPrint').addEventListener('click',function(){
   // PDF로 저장할 때 파일 이름이 "20261011_셀 교재 (KR)"처럼 정해지도록
   var oldTitle=document.title;document.title=archiveName();
   setTimeout(function(){window.print();setTimeout(function(){document.title=oldTitle;},500);},150);
-  if(GS) $('archStatus').textContent='PDF로 저장하셨다면, 아래 버튼으로 그 파일을 골라 드라이브에 올려 주세요.';
 });
 if(document.fonts){
   document.fonts.ready.then(render);
@@ -1852,7 +1854,7 @@ function archiveName(){
 var archReady=false;
 function renderArchive(){
   if(!GS||!ARCH||!archReady) return; // 서버에 보관 기능이 설치된 경우에만 보임
-  $('archivePanel').style.display='';
+  $('archivePanel').style.display='';$('btnArchive').style.display='';document.querySelector('.bottom-bar').classList.add('two');
   var a=ARCH[state.lang],y=String(state.date||'').slice(0,4)||'연도';
   $('archDest').innerHTML='지금 보고 계신 <b>'+a.label+' 교재</b>는<br>구글 드라이브 <b>'+esc(y)+' › '+esc(a.folder)+'</b> 폴더에<br><b>'+esc(archiveName())+'.pdf</b> 이름으로 보관됩니다.';
 }
@@ -1861,33 +1863,78 @@ function archStatus(html,warn){var el=$('archStatus');el.innerHTML=html;el.class
 if(GS) api('savePdf',[]).then(function(){},function(e){
   if(!/알 수 없는 요청/.test((e&&e.message)||'')&&!/^HTTP|Failed to fetch|NetworkError/i.test((e&&e.message)||'')){archReady=true;renderArchive();}
 });
-$('fArchive').addEventListener('change',function(){
-  var f=this.files&&this.files[0];this.value='';
-  if(!f) return;
-  if(!/\.pdf$/i.test(f.name)&&f.type!=='application/pdf'){archStatus('PDF 파일만 올릴 수 있습니다.',true);return;}
-  if(f.size>30*1024*1024){archStatus('파일이 너무 큽니다(30MB 넘음). PDF를 다시 저장해 주세요.',true);return;}
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(state.date||'')){archStatus('교재 날짜를 먼저 정해 주세요.',true);return;}
-  var a=ARCH[state.lang],other=ARCH[state.lang==='ko'?'en':'ko'];
-  // 파일 이름으로 보아 다른 언어 교재 같으면 한 번 더 확인
-  var looksOther=state.lang==='ko'?/\(EN\)|_EN\b|Cell Textbook/i.test(f.name):/\(KR\)|_KR\b|셀 ?교재/.test(f.name);
-  if(looksOther&&!confirm('고르신 파일('+f.name+')이 '+other.label+' 교재처럼 보입니다.\n지금은 '+a.label+' 교재 화면입니다. 그래도 '+a.label+' 교재로 올릴까요?')) return;
-  if(!confirm('"'+archiveName()+'.pdf" 이름으로 드라이브에 보관할까요?\n\n같은 이름의 파일이 이미 있으면 새 파일로 바꾸고, 이전 파일은 드라이브 휴지통으로 옮깁니다.')) return;
-  archStatus('올리는 중입니다… 잠시만 기다려 주세요.');
+function loadScript(src){
+  return new Promise(function(res,rej){
+    var el=document.createElement('script');el.src=src;el.onload=res;
+    el.onerror=function(){rej(new Error('PDF 만드는 도구를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'));};
+    document.head.appendChild(el);
+  });
+}
+function pdfTools(){
+  var p=[];
+  if(!window.html2canvas) p.push(loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'));
+  if(!(window.jspdf&&window.jspdf.jsPDF)) p.push(loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'));
+  return Promise.all(p);
+}
+/* 교재 쪽을 고해상도(약 290dpi) 그림으로 찍어 A4 PDF로 묶음 */
+function makePdf(progress){
+  var box=document.createElement('div');box.id='capture';
+  box.style.cssText=pagesEl.style.cssText; // 글꼴·크기 설정을 그대로 가져옴
+  box.style.setProperty('--s','1');
+  box.innerHTML=pagesEl.innerHTML;
+  // 그림으로 찍을 때만: 표지 사진은 배경으로, 강조 형광펜은 띠 모양으로 (그림이라 휴대폰에서도 똑같이 보임)
+  Array.prototype.forEach.call(box.querySelectorAll('.banner img'),function(img){
+    var b=img.parentNode;b.style.backgroundImage='url("'+img.src+'")';b.style.backgroundSize='cover';b.style.backgroundPosition='center';img.style.display='none';
+  });
+  Array.prototype.forEach.call(box.querySelectorAll('.page:not(.lang-en) .em'),function(e){
+    e.style.textDecoration='none';
+    e.style.backgroundImage='linear-gradient(transparent 34%,var(--c-mark) 34%,var(--c-mark) 70%,transparent 70%)';
+  });
+  document.body.appendChild(box);
+  var pages=box.querySelectorAll('.page'),pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4',compress:true}),i=0;
+  function next(){
+    if(i>=pages.length) return Promise.resolve();
+    progress(i+1,pages.length);
+    return window.html2canvas(pages[i],{scale:3,backgroundColor:'#ffffff',useCORS:true,logging:false,width:794,height:1123,scrollX:0,scrollY:0,windowWidth:1200})
+      .then(function(cv){
+        if(i>0) pdf.addPage('a4','portrait');
+        pdf.addImage(cv.toDataURL('image/jpeg',0.9),'JPEG',0,0,210,297,undefined,'FAST');
+        i++;return next();
+      });
+  }
+  return next().then(function(){
+    box.remove();
+    return String(pdf.output('datauristring')).replace(/^data:[^,]*,/,'');
+  },function(e){box.remove();throw e;});
+}
+$('btnArchive').addEventListener('click',function(){
+  var btn=this,label=btn.textContent;
+  clearTimeout(timer);render();save();if(GS) syncNow();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(state.date||'')){archStatus('교재 날짜를 먼저 정해 주세요.',true);alert('교재 날짜를 먼저 정해 주세요.');return;}
+  checkFonts();
+  if(missingFonts.length&&!confirm('원래 교재 글꼴 '+missingFonts.length+'개('+missingFonts.map(function(m){return m.label;}).join(', ')+')가 이 컴퓨터에 없습니다.\n비슷한 글꼴로 PDF가 만들어집니다. 그래도 저장할까요?')) return;
+  if(pageTotal>MAX_PAGES&&!confirm('지금 '+pageTotal+'쪽으로, 최대 '+MAX_PAGES+'쪽을 넘었습니다.\n그래도 저장할까요?')) return;
+  var a=ARCH[state.lang],name=archiveName();
+  if(!confirm(a.label+' 교재를 PDF로 만들어\n구글 드라이브 '+String(state.date).slice(0,4)+' › '+a.folder+' 폴더에\n"'+name+'.pdf" 이름으로 저장할까요?\n\n같은 이름의 파일이 있으면 새 파일로 바꾸고, 이전 파일은 드라이브 휴지통으로 옮깁니다.')) return;
   var lang=state.lang,date=state.date;
-  var rd=new FileReader();
-  rd.onload=function(){
-    var b64=String(rd.result).replace(/^data:[^,]*,/,'');
-    call('savePdf',lang,date,b64).then(function(r){
-      archStatus('보관했습니다. '+esc(r.folder)+' › '+esc(r.name)+(r.replaced?' (이전 파일은 휴지통으로 옮김)':'')+' · <a href="'+esc(r.url)+'" target="_blank" rel="noopener">드라이브에서 보기</a>');
-    },function(e){
-      var m=(e&&e.message)||String(e||'');
-      if(/BADPASS|NOPASS/.test(m)) archStatus('비밀번호를 넣으신 뒤 다시 골라 주세요.',true);
-      else if(/알 수 없는 요청/.test(m)) archStatus('드라이브 보관 기능이 아직 서버(Apps Script)에 설치되지 않았습니다. 담당 사역자에게 알려 주세요.',true);
-      else archStatus('올리지 못했습니다: '+esc(m),true);
-    });
-  };
-  rd.onerror=function(){archStatus('파일을 읽지 못했습니다. 다시 골라 주세요.',true);};
-  rd.readAsDataURL(f);
+  btn.disabled=true;
+  function done(){btn.disabled=false;btn.textContent=label;}
+  btn.textContent='PDF 만드는 중…';archStatus('PDF를 만드는 중입니다…');
+  pdfTools().then(function(){
+    return makePdf(function(n,t){btn.textContent='PDF 만드는 중 '+n+'/'+t;archStatus('PDF를 만드는 중입니다… ('+n+'/'+t+'쪽)');});
+  }).then(function(b64){
+    btn.textContent='드라이브에 올리는 중…';archStatus('드라이브에 올리는 중입니다…');
+    return call('savePdf',lang,date,b64);
+  }).then(function(r){
+    done();
+    archStatus('저장했습니다. '+esc(r.folder)+' › '+esc(r.name)+(r.replaced?' (이전 파일은 휴지통으로 옮김)':'')+' · <a href="'+esc(r.url)+'" target="_blank" rel="noopener">드라이브에서 보기</a>');
+    if(confirm('드라이브에 저장했습니다.\n'+r.folder+' › '+r.name+'\n\n드라이브에서 열어 볼까요?')) window.open(r.url,'_blank','noopener');
+  },function(e){
+    done();
+    var m=(e&&e.message)||String(e||'');
+    var msg=/BADPASS/.test(m)?'비밀번호를 넣으신 뒤 다시 눌러 주세요.':/알 수 없는 요청/.test(m)?'드라이브 보관 기능이 서버(Apps Script)에 설치되지 않았습니다. 담당 사역자에게 알려 주세요.':'저장하지 못했습니다: '+m;
+    archStatus(esc(msg),true);alert(msg);
+  });
 });
 $('passOk').addEventListener('click',submitPass);
 $('passInput').addEventListener('keydown',function(e){if(e.key==='Enter')submitPass();});
