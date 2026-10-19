@@ -25,7 +25,7 @@ function doGet() {
 var API_ = {
   checkPassword: checkPassword, init: init, listBooks: listBooks, loadBook: loadBook,
   getVersion: getVersion, saveBook: saveBook, createBook: createBook, saveSettings: saveSettings,
-  savePdf: savePdf
+  savePdf: savePdf, deleteBook: deleteBook
 };
 function doPost(e) {
   var out;
@@ -210,6 +210,28 @@ function createBook(pw, date, fromId) {
     setText_(sh, row, 1, [id, date, '', '', me_(), now_(), 1, img]);
     writeChunks_(sh, row, DATA_COL_BOOK, JSON.stringify(obj));
     return id;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* 교재 지우기: 시트에서 바로 없애지 않고 '지운 교재' 탭으로 옮겨 둡니다.
+ * 되살리려면 '지운 교재' 탭의 그 줄에서 [번호]부터 끝까지 복사해 '교재' 탭 맨 아래에 붙여 넣으면 됩니다. */
+function deleteBook(pw, id, name) {
+  pass_(pw);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sh = books_(), row = findRow_(sh, id);
+    if (!row) throw new Error('교재를 찾지 못했습니다. 이미 지워졌을 수 있습니다.');
+    var vals = sh.getRange(row, 1, 1, sh.getLastColumn()).getValues()[0];
+    while (vals.length > 9 && vals[vals.length - 1] === '') vals.pop();
+    var bin = sheet_('지운 교재', ['지운 사람', '지운 시각', '번호', '날짜', '한글 제목', '영어 제목', '저장한 사람', '저장 시각', '버전', '사진 번호', '내용(자동)']);
+    var need = 2 + vals.length;
+    if (bin.getMaxColumns() < need) bin.insertColumnsAfter(bin.getMaxColumns(), need - bin.getMaxColumns());
+    setText_(bin, bin.getLastRow() + 1, 1, [name || me_(), now_()].concat(vals));
+    sh.deleteRow(row);
+    return true;
   } finally {
     lock.releaseLock();
   }

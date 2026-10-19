@@ -333,6 +333,7 @@ details.help code{background:#fff;padding:1px 6px;border-radius:6px;font-family:
       <div class="field">
         <label for="bookSel">작업할 교재</label>
         <select id="bookSel"></select>
+        <button type="button" class="btn quiet danger" id="btnDelBook" style="display:none;margin-top:8px;width:100%">지금 보고 있는 교재 지우기</button>
       </div>
       <div class="field">
         <label for="newDate">새 교재 만들기</label>
@@ -2029,6 +2030,34 @@ $('btnNewBook').addEventListener('click',function(){
   syncNow().then(function(){return call('createBook',d,cur.id||'');}).then(function(id){
     return call('listBooks').then(function(l){books=l;return openBook(id,'새 교재를 만들었습니다.');});
   }).catch(function(){showSync('새 교재를 만들지 못했습니다.',true);});
+});
+/* 잘못 만든 교재 지우기 (서버에 기능이 있을 때만 버튼이 보임) */
+if(GS) api('deleteBook',[]).then(function(){},function(e){
+  var m=(e&&e.message)||'';
+  if(!/알 수 없는 요청/.test(m)&&!/^HTTP|Failed to fetch|NetworkError/i.test(m)) $('btnDelBook').style.display='';
+});
+$('btnDelBook').addEventListener('click',function(){
+  if(!cur.id) return;
+  var b=books.filter(function(x){return x.id===cur.id;})[0]||{};
+  var label=fmtDateKo(b.date||state.date)+' · '+(b.titleKo||b.titleEn||'(제목 없음)');
+  if(!confirm('이 교재를 지울까요?\n\n'+label+'\n\n한글·영어 교재가 함께 지워집니다.\n(실수로 지웠다면 구글 시트의 "지운 교재" 탭에서 되살릴 수 있습니다.)')) return;
+  var id=cur.id,btn=this;
+  clearTimeout(syncTimer);clearTimeout(timer);
+  btn.disabled=true;showSync('교재를 지우는 중…');
+  call('deleteBook',id,myName()).then(function(){
+    cur={id:null,version:0,saving:false,conflict:false,savedBy:'',savedAt:''};
+    try{if(localStorage.getItem('cellbook-lastbook')===id) localStorage.removeItem('cellbook-lastbook');}catch(e){}
+    return call('listBooks');
+  }).then(function(l){
+    books=l||[];btn.disabled=false;
+    if(books.length) return openBook(books[0].id,'교재를 지웠습니다. ('+label+')');
+    return call('createBook',nextSunday(),'').then(function(nid){
+      return call('listBooks').then(function(l2){books=l2;return openBook(nid,'교재를 지우고, 빈 새 교재를 만들었습니다.');});
+    });
+  }).catch(function(e){
+    btn.disabled=false;
+    showSync('교재를 지우지 못했습니다: '+((e&&e.message)||e),true);
+  });
 });
 (function(){
   var n='';try{n=localStorage.getItem('cellbook-myname')||'';}catch(e){}
