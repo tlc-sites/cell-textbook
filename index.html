@@ -1806,7 +1806,7 @@ en:{title:'Ask, and It Shall Be Given',ref:'MATTHEW 7 : 7-12',body:[
 
 /* ===================== 구글 시트 저장 (Apps Script) ===================== */
 /* 저장 창구 주소 (구글 Apps Script 웹 앱 주소) */
-var API_URL='https://script.google.com/macros/s/AKfycbwJB5XUgVgzm-oPQKaKNGk4ZnSkHwED27DqIm-vtdH0VHDuF0UiqXvbc7r84BgSxcRNeQ/exec';
+var API_URL='https://script.google.com/macros/s/AKfycbz9T4ZTUx0vRspWt8LsnNBpwfepdZT7aJIdGH8OrjK2FGYTITQ4BOjMLjWa4fkGjQZj7A/exec';
 var GS=!!API_URL;
 function api(fn,args){
   return fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:args||[]}),redirect:'follow',credentials:'omit'})
