@@ -1849,14 +1849,18 @@ function archiveName(){
   var d=String(state.date||'').replace(/\D/g,'');
   return (d||'날짜없음')+'_'+ARCH[state.lang].name;
 }
+var archReady=false;
 function renderArchive(){
-  if(!GS||!ARCH) return; // 처음 화면을 그릴 때는 아직 준비 전일 수 있음
+  if(!GS||!ARCH||!archReady) return; // 서버에 보관 기능이 설치된 경우에만 보임
   $('archivePanel').style.display='';
   var a=ARCH[state.lang],y=String(state.date||'').slice(0,4)||'연도';
   $('archDest').innerHTML='지금 보고 계신 <b>'+a.label+' 교재</b>는<br>구글 드라이브 <b>'+esc(y)+' › '+esc(a.folder)+'</b> 폴더에<br><b>'+esc(archiveName())+'.pdf</b> 이름으로 보관됩니다.';
 }
 function archStatus(html,warn){var el=$('archStatus');el.innerHTML=html;el.className='status'+(warn?' warn':'');}
-renderArchive();
+// 서버(Apps Script)에 보관 기능이 설치되어 있는지 확인: 설치 전이면 "알 수 없는 요청"이 돌아옴
+if(GS) api('savePdf',[]).then(function(){},function(e){
+  if(!/알 수 없는 요청/.test((e&&e.message)||'')&&!/^HTTP|Failed to fetch|NetworkError/i.test((e&&e.message)||'')){archReady=true;renderArchive();}
+});
 $('fArchive').addEventListener('change',function(){
   var f=this.files&&this.files[0];this.value='';
   if(!f) return;
