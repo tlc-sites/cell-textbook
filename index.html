@@ -2026,7 +2026,8 @@ function startSync(){
   });
 }
 if(GS){
-  if(getPass()) startSync(); else {showSync('편집 비밀번호를 넣으면 교재를 불러옵니다.',true);askPass(false);}
+  // 서버에 비밀번호가 없으면 바로 열리고, 있으면 그때 비밀번호 창이 뜸
+  startSync();
 } else {
   showSync('구글 시트와 연결되지 않아 이 컴퓨터에만 저장됩니다.');
 }

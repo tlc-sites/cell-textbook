@@ -115,11 +115,11 @@ function loadImage_(id) {
 }
 
 /* ---------- 편집 비밀번호 ----------
- * 비밀번호는 코드에 쓰지 않고 [프로젝트 설정 → 스크립트 속성]에
- * 이름 PASSWORD 로 넣어 둡니다. */
+ * [프로젝트 설정 → 스크립트 속성]에 PASSWORD 가 없으면 비밀번호 없이 누구나 씁니다.
+ * 나중에 다시 잠그고 싶으면 이름 PASSWORD 로 값을 넣기만 하면 됩니다. (다시 배포할 필요 없음) */
 function pass_(pw) {
   var p = PropertiesService.getScriptProperties().getProperty('PASSWORD');
-  if (!p) throw new Error('NOPASS');
+  if (!p) return;
   if (String(pw || '') !== String(p)) { Utilities.sleep(800); throw new Error('BADPASS'); }
 }
 function checkPassword(pw) {
