@@ -190,6 +190,11 @@ details.help code{background:#fff;padding:1px 6px;border-radius:6px;font-family:
 .book-row input{flex:1;min-width:160px}
 .status{color:var(--ok);font-size:15px;min-height:24px;margin-top:6px}
 .status.warn{color:#A33A2A}
+.arch-steps{margin:0 0 10px;padding-left:22px;font-size:16px}
+.arch-steps li{margin-bottom:6px}
+.arch-dest{margin:0 0 12px;padding:10px 12px;border-radius:12px;background:var(--bg);font-size:16px;word-break:keep-all}
+.arch-dest b{word-break:break-all}
+.status a{color:inherit;font-weight:700}
 .over-warn{display:none;background:#FBE7E3;color:#8A2E20;border-radius:12px;padding:12px 14px;font-size:16px;margin:10px 0}
 .over-warn.show{display:block}
 
@@ -488,6 +493,18 @@ details.help code{background:#fff;padding:1px 6px;border-radius:6px;font-family:
         <button type="button" class="btn quiet" id="btnFontReset">이 교재의 글꼴과 크기를 모두 기본으로</button>
         <span class="hint" style="display:block;color:var(--sub);font-size:15px;margin-top:12px">글꼴 이름이 컴퓨터에 다르게 설치되어 있다면 "직접 입력하기"로 정확한 이름을 넣어 주세요.</span>
       </details>
+    </div>
+
+    <div class="panel" id="archivePanel" style="display:none">
+      <h2>완성본 드라이브에 보관하기</h2>
+      <ol class="arch-steps">
+        <li>아래 <b>인쇄하거나 PDF로 저장</b>을 눌러 <b>PDF로 저장</b>합니다. 파일 이름은 자동으로 정해져 있어요.</li>
+        <li>저장한 PDF를 아래 버튼으로 골라 주세요.</li>
+      </ol>
+      <p class="arch-dest" id="archDest"></p>
+      <label class="btn primary wide" for="fArchive" style="display:flex;align-items:center;justify-content:center">저장한 PDF 골라서 드라이브에 올리기</label>
+      <input type="file" id="fArchive" accept="application/pdf,.pdf" hidden>
+      <div class="status" id="archStatus" aria-live="polite"></div>
     </div>
   </section>
 
@@ -1012,6 +1029,7 @@ function render(){
   for(var i=0;i<foots.length;i++) foots[i].textContent=label+(i+1);
   updateCount(foots.length);
   renderNoteBox();
+  renderArchive();
   renderGreekPanel();
   renderCheckPanel();
   fitScale();
@@ -1746,7 +1764,10 @@ $('btnPrint').addEventListener('click',function(){
   checkFonts();
   if(missingFonts.length&&!confirm('원래 교재 글꼴 '+missingFonts.length+'개('+missingFonts.map(function(m){return m.label;}).join(', ')+')가 이 컴퓨터에 없습니다.\n비슷한 글꼴로 인쇄됩니다. 그래도 인쇄할까요?\n\n글꼴 설치 방법은 "원래 교재 글꼴 확인" 칸을 봐 주세요.')) return;
   if(pageTotal>MAX_PAGES&&!confirm('지금 '+pageTotal+'쪽으로, 최대 '+MAX_PAGES+'쪽을 넘었습니다.\n그래도 인쇄할까요?')) return;
-  setTimeout(function(){window.print();},150);
+  // PDF로 저장할 때 파일 이름이 "20261011_셀 교재 (KR)"처럼 정해지도록
+  var oldTitle=document.title;document.title=archiveName();
+  setTimeout(function(){window.print();setTimeout(function(){document.title=oldTitle;},500);},150);
+  if(GS) $('archStatus').textContent='PDF로 저장하셨다면, 아래 버튼으로 그 파일을 골라 드라이브에 올려 주세요.';
 });
 if(document.fonts){
   document.fonts.ready.then(render);
@@ -1822,6 +1843,48 @@ function submitPass(){
     }
   },function(){$('passOk').disabled=false;$('passMsg').textContent='확인하지 못했습니다. 인터넷 연결을 확인해 주세요.';});
 }
+/* ===================== 완성본 PDF 드라이브 보관 ===================== */
+var ARCH={ko:{folder:'셀 교재(KR)',name:'셀 교재 (KR)',label:'한글'},en:{folder:'Cell Textbook(EN)',name:'Cell Textbook (EN)',label:'영어'}};
+function archiveName(){
+  var d=String(state.date||'').replace(/\D/g,'');
+  return (d||'날짜없음')+'_'+ARCH[state.lang].name;
+}
+function renderArchive(){
+  if(!GS||!ARCH) return; // 처음 화면을 그릴 때는 아직 준비 전일 수 있음
+  $('archivePanel').style.display='';
+  var a=ARCH[state.lang],y=String(state.date||'').slice(0,4)||'연도';
+  $('archDest').innerHTML='지금 보고 계신 <b>'+a.label+' 교재</b>는<br>구글 드라이브 <b>'+esc(y)+' › '+esc(a.folder)+'</b> 폴더에<br><b>'+esc(archiveName())+'.pdf</b> 이름으로 보관됩니다.';
+}
+function archStatus(html,warn){var el=$('archStatus');el.innerHTML=html;el.className='status'+(warn?' warn':'');}
+renderArchive();
+$('fArchive').addEventListener('change',function(){
+  var f=this.files&&this.files[0];this.value='';
+  if(!f) return;
+  if(!/\.pdf$/i.test(f.name)&&f.type!=='application/pdf'){archStatus('PDF 파일만 올릴 수 있습니다.',true);return;}
+  if(f.size>30*1024*1024){archStatus('파일이 너무 큽니다(30MB 넘음). PDF를 다시 저장해 주세요.',true);return;}
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(state.date||'')){archStatus('교재 날짜를 먼저 정해 주세요.',true);return;}
+  var a=ARCH[state.lang],other=ARCH[state.lang==='ko'?'en':'ko'];
+  // 파일 이름으로 보아 다른 언어 교재 같으면 한 번 더 확인
+  var looksOther=state.lang==='ko'?/\(EN\)|_EN\b|Cell Textbook/i.test(f.name):/\(KR\)|_KR\b|셀 ?교재/.test(f.name);
+  if(looksOther&&!confirm('고르신 파일('+f.name+')이 '+other.label+' 교재처럼 보입니다.\n지금은 '+a.label+' 교재 화면입니다. 그래도 '+a.label+' 교재로 올릴까요?')) return;
+  if(!confirm('"'+archiveName()+'.pdf" 이름으로 드라이브에 보관할까요?\n\n같은 이름의 파일이 이미 있으면 새 파일로 바꾸고, 이전 파일은 드라이브 휴지통으로 옮깁니다.')) return;
+  archStatus('올리는 중입니다… 잠시만 기다려 주세요.');
+  var lang=state.lang,date=state.date;
+  var rd=new FileReader();
+  rd.onload=function(){
+    var b64=String(rd.result).replace(/^data:[^,]*,/,'');
+    call('savePdf',lang,date,b64).then(function(r){
+      archStatus('보관했습니다. '+esc(r.folder)+' › '+esc(r.name)+(r.replaced?' (이전 파일은 휴지통으로 옮김)':'')+' · <a href="'+esc(r.url)+'" target="_blank" rel="noopener">드라이브에서 보기</a>');
+    },function(e){
+      var m=(e&&e.message)||String(e||'');
+      if(/BADPASS|NOPASS/.test(m)) archStatus('비밀번호를 넣으신 뒤 다시 골라 주세요.',true);
+      else if(/알 수 없는 요청/.test(m)) archStatus('드라이브 보관 기능이 아직 서버(Apps Script)에 설치되지 않았습니다. 담당 사역자에게 알려 주세요.',true);
+      else archStatus('올리지 못했습니다: '+esc(m),true);
+    });
+  };
+  rd.onerror=function(){archStatus('파일을 읽지 못했습니다. 다시 골라 주세요.',true);};
+  rd.readAsDataURL(f);
+});
 $('passOk').addEventListener('click',submitPass);
 $('passInput').addEventListener('keydown',function(e){if(e.key==='Enter')submitPass();});
 var cur={id:null,version:0,saving:false,conflict:false,savedBy:'',savedAt:''};
