@@ -25,7 +25,7 @@ function doGet() {
 var API_ = {
   checkPassword: checkPassword, init: init, listBooks: listBooks, loadBook: loadBook,
   getVersion: getVersion, saveBook: saveBook, createBook: createBook, saveSettings: saveSettings,
-  savePdf: savePdf, deleteBook: deleteBook
+  savePdf: savePdf, deleteBook: deleteBook, presence: presence
 };
 function doPost(e) {
   var out;
@@ -234,6 +234,31 @@ function deleteBook(pw, id, name) {
     return true;
   } finally {
     lock.releaseLock();
+  }
+}
+
+/* 누가 같은 교재를 열어 두었는지 알려 주기 (시트에는 남기지 않고 잠깐만 기억)
+ * 화면이 20초마다 알려 오고, 90초 넘게 소식이 없으면 나간 것으로 봅니다. */
+function presence(pw, bookId, clientId, name, lang, editedAgo, leaving) {
+  pass_(pw);
+  if (!bookId || !clientId) return [];
+  var cache = CacheService.getScriptCache(), key = 'pres_' + bookId, now = Date.now();
+  var lock = LockService.getScriptLock();
+  var locked = lock.tryLock(3000);
+  try {
+    var list = {};
+    try { list = JSON.parse(cache.get(key) || '{}'); } catch (e) {}
+    Object.keys(list).forEach(function (k) { if (now - list[k].at > 90000) delete list[k]; });
+    if (leaving) delete list[clientId];
+    else list[clientId] = { name: String(name || '').slice(0, 40), lang: lang === 'en' ? 'en' : 'ko', at: now,
+                            edit: (editedAgo == null || editedAgo < 0) ? 0 : now - Number(editedAgo) };
+    cache.put(key, JSON.stringify(list), 600);
+    return Object.keys(list).filter(function (k) { return k !== clientId; }).map(function (k) {
+      var x = list[k];
+      return { name: x.name, lang: x.lang, editing: !!x.edit && now - x.edit < 120000 };
+    });
+  } finally {
+    if (locked) lock.releaseLock();
   }
 }
 
