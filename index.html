@@ -91,6 +91,7 @@ input[type=text]:focus,input[type=date]:focus,select:focus,textarea:focus{border
 .toolbar button{min-height:48px;padding:6px 16px;border-radius:10px;border:2px solid var(--line);background:#fff;font-size:17px}
 .em-sample{font-style:italic;background:linear-gradient(transparent 34%,#F3D3BE 34%,#F3D3BE 70%,transparent 70%)}
 .sm-sample{font-size:14px;color:var(--sub)}
+.gk-sample{font-family:'Noto Serif',Georgia,serif;font-style:italic}
 .qt-sample{border-left:4px solid var(--c-bar);padding-left:7px}
 .ta-wrap{position:relative}
 textarea{
@@ -437,6 +438,7 @@ details.help code{background:#fff;padding:1px 6px;border-radius:6px;font-family:
           <li><code>(헬라어 δέησις 데에시스: 간청, 요청)</code>처럼 쓰면 원어 표기가 자동으로 꾸며집니다.</li>
           <li>강조하거나 작게 쓸 글자를 고르면 <b>바로 위에 버튼</b>이 나타납니다. 이미 꾸민 글자를 고르고 다시 누르면 원래대로 돌아갑니다. 본문 칸에는 <code>*강조*</code>, <code>{{작은 글씨}}</code>처럼 표시됩니다.</li>
           <li>한글 교재의 <code>(헬라어 agonizomai, 아고니조마이: …)</code>는 <b>원어 단어장</b>에 등록된 단어라면 그리스어 글자로 바뀌어 인쇄됩니다. 본문 칸에는 영문 그대로 둬도 됩니다.</li>
+          <li><code>(poieo)</code>처럼 모양이 다른 원어는 단어를 드래그한 뒤 <b>헬라어</b> 버튼을 누르세요. <code>[[poieo]]</code>로 표시되고, 단어장에 있으면 그리스어 글자로 바뀝니다.</li>
           <li>각 Q의 마지막 문단 아래에는 나눔을 적을 줄이 쪽 끝까지 자동으로 들어갑니다. 필기 줄 때문에 쪽이 늘어나지는 않습니다.</li>
           <li>교재는 최대 6쪽(종이 3장)까지입니다. 넘으면 빨간 알림이 나옵니다.</li>
         </ol>
@@ -445,12 +447,14 @@ details.help code{background:#fff;padding:1px 6px;border-radius:6px;font-family:
       <div class="toolbar">
         <button type="button" data-wrap="em"><span class="em-sample">강조</span></button>
         <button type="button" data-wrap="sm"><span class="sm-sample">작은 글씨</span></button>
+        <button type="button" data-wrap="gk"><span class="gk-sample">헬라어</span></button>
         <button type="button" data-wrap="quote"><span class="qt-sample">성경 말씀</span></button>
       </div>
       <div class="ta-wrap" id="taWrap">
         <div class="selbar" id="selbar" role="toolbar" aria-label="고른 글자 꾸미기">
           <button type="button" data-wrap="em"><span class="em-sample">강조</span></button>
           <button type="button" data-wrap="sm"><span class="sm-sample">작은 글씨</span></button>
+        <button type="button" data-wrap="gk"><span class="gk-sample">헬라어</span></button>
           <button type="button" data-wrap="quote"><span class="qt-sample">성경 말씀</span></button>
         </div>
         <textarea id="fBody" placeholder="위의 '목사님 아웃라인 붙여 넣기'를 누르시거나, 여기에 직접 써 주세요.&#10;&#10;Q1 구하라 그리하면 너희에게 주실 것이요&#10;예수님께서는 확실한 약속과 함께…&#10;“모든 일에 기도와 간구로 … 하나님께 아뢰라.” 빌립보서 4:6."></textarea>
@@ -936,6 +940,13 @@ var PATTERNS=[
    f:function(m){var x=function(s){return s.replace(/\*/g,'').trim();};return [{t:'('+m[1]+' ',c:''},{t:lookupGreek(x(m[2])),c:'grk'},{t:' ',c:''},{t:x(m[3]),c:'em'},{t:': ',c:''},{t:x(m[4]),c:'def'},{t:')',c:''}];}},
   {re:/\((Greek|Gr\.|Hebrew|Heb\.|Aramaic)\s+([^:()]+?)\s*:\s*([^()]*)\)/i,
    f:function(m){var x=function(s){return s.replace(/\*/g,'').trim();};return [{t:'('+m[1]+' ',c:''},{t:x(m[2]),c:'it'},{t:': ',c:''},{t:x(m[3]),c:'def'},{t:')',c:''}];}},
+  /* [[poieo]] 또는 [[poiema, 포이에마]]: 드래그해서 '헬라어' 버튼으로 표시한 원어 */
+  {re:/\[\[([^\[\]]+)\]\]/, f:function(m){
+    var raw=m[1].replace(/\*/g,'').trim(),mm=/^([^\s,:：]+)\s*,?\s*(.*)$/.exec(raw)||[raw,raw,''];
+    var w=lookupGreek(mm[1]),out=[{t:w,c:/[\u0370-\u03FF\u1F00-\u1FFF]/.test(w)?'grk':'it'}];
+    if(mm[2]) out.push({t:' ',c:''},{t:mm[2],c:state.lang==='ko'?'em':''});
+    return out;
+  }},
   {re:/\{\{([^{}]+)\}\}/, f:function(m){return [{t:m[1],c:'ref'}];}},
   {re:/\*([^*\n]+)\*/, f:function(m){return [{t:m[1],c:'em'}];}}
 ];
@@ -1387,7 +1398,7 @@ document.querySelectorAll('#langSeg button').forEach(function(b){
 });
 
 /* ===================== 강조 / 작은 글씨 ===================== */
-var MARKS={em:['*','*'],sm:['{{','}}']};
+var MARKS={em:['*','*'],sm:['{{','}}'],gk:['[[',']]']};
 function wrapState(k){
   var b=MARKS[k][0],a=MARKS[k][1],v=fBody.value,s=fBody.selectionStart,e=fBody.selectionEnd,sel=v.slice(s,e);
   if(sel.length>b.length+a.length&&sel.slice(0,b.length)===b&&sel.slice(-a.length)===a) return 'inside';
@@ -1460,6 +1471,7 @@ function updateSelbar(){
   if(document.activeElement!==fBody||fBody.selectionStart===fBody.selectionEnd){selbar.classList.remove('show');return;}
   selbar.querySelector('[data-wrap="em"]').innerHTML=wrapState('em')?'강조 풀기':'<span class="em-sample">강조</span>';
   selbar.querySelector('[data-wrap="sm"]').innerHTML=wrapState('sm')?'작은 글씨 풀기':'<span class="sm-sample">작은 글씨</span>';
+  selbar.querySelector('[data-wrap="gk"]').innerHTML=wrapState('gk')?'헬라어 풀기':'<span class="gk-sample">헬라어</span>';
   selbar.querySelector('[data-wrap="quote"]').innerHTML=onQuoteLine()?'말씀 풀기':'<span class="qt-sample">성경 말씀</span>';
   selbar.classList.add('show');
   var st=caretXY(fBody.selectionStart),bw=selbar.offsetWidth,bh=selbar.offsetHeight,top,left;
