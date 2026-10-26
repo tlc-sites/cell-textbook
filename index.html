@@ -940,6 +940,13 @@ var PATTERNS=[
    f:function(m){var x=function(s){return s.replace(/\*/g,'').trim();};return [{t:'('+m[1]+' ',c:''},{t:lookupGreek(x(m[2])),c:'grk'},{t:' ',c:''},{t:x(m[3]),c:'em'},{t:': ',c:''},{t:x(m[4]),c:'def'},{t:')',c:''}];}},
   {re:/\((Greek|Gr\.|Hebrew|Heb\.|Aramaic)\s+([^:()]+?)\s*:\s*([^()]*)\)/i,
    f:function(m){var x=function(s){return s.replace(/\*/g,'').trim();};return [{t:'('+m[1]+' ',c:''},{t:x(m[2]),c:'it'},{t:': ',c:''},{t:x(m[3]),c:'def'},{t:')',c:''}];}},
+  /* 헬라어 συμπαθέω(쉼파데오, sympatheō) / 헬라어 ἔρημος(에레모스) 모양 */
+  {re:/(헬라어|히브리어|아람어)\s+([A-Za-z\u00C0-\u024F\u1E00-\u1EFF\u0370-\u03FF\u1F00-\u1FFF\u0590-\u05FF]+)\s*\(\s*([^,()]+?)\s*(?:,\s*([^()]+?)\s*)?\)/,
+   f:function(m){
+     var w=lookupGreek(m[2]),out=[{t:m[1]+' ',c:''},{t:w,c:/[A-Za-z]/.test(w)?'it':'grk'},{t:'(',c:''},{t:m[3],c:state.lang==='ko'?'em':''}];
+     if(m[4]) out.push({t:', ',c:''},{t:m[4],c:'it'});
+     out.push({t:')',c:''});return out;
+   }},
   /* [[poieo]] 또는 [[poiema, 포이에마]]: 드래그해서 '헬라어' 버튼으로 표시한 원어 */
   {re:/\[\[([^\[\]]+)\]\]/, f:function(m){
     var raw=m[1].replace(/\*/g,'').trim(),mm=/^([^\s,:：]+)\s*,?\s*(.*)$/.exec(raw)||[raw,raw,''];
