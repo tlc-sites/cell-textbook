@@ -435,7 +435,7 @@ details.help code{background:#fff;padding:1px 6px;border-radius:6px;font-family:
           <li><code>Q1</code>, <code>Q2</code>로 시작하는 줄은 소제목이 되고, 새 쪽에서 시작합니다.</li>
           <li>따옴표(“)로 시작하고 끝에 구절(예: 빌립보서 4:6.)이 붙은 줄은 <b>성경 인용</b> 칸이 됩니다. 구절은 작은 글씨로 바뀝니다.</li>
           <li>인용 칸으로 바뀌지 않은 말씀은 <b>말씀 부분을 드래그</b>한 뒤 <b>성경 말씀</b> 버튼을 누르세요. 그 부분만 따로 떼어 인용 칸으로 만듭니다. 다시 누르면 앞뒤 문단과 합쳐집니다.</li>
-          <li><code>(헬라어 δέησις 데에시스: 간청, 요청)</code>처럼 쓰면 원어 표기가 자동으로 꾸며집니다.</li>
+          <li><code>(헬라어 δέησις 데에시스: 간청, 요청)</code>, <code>(헬라어 συμπαθέω 쉼파데오: sympatheō)</code>, <code>(헬라어 μετριοπαθέω 메트리오파데오, metriopatheō)</code>, <code>헬라어 ἔρημος(에레모스, erēmos)</code>처럼 어떤 모양으로 써도 원어 표기가 자동으로 꾸며집니다.</li>
           <li>강조하거나 작게 쓸 글자를 고르면 <b>바로 위에 버튼</b>이 나타납니다. 이미 꾸민 글자를 고르고 다시 누르면 원래대로 돌아갑니다. 본문 칸에는 <code>*강조*</code>, <code>{{작은 글씨}}</code>처럼 표시됩니다.</li>
           <li>한글 교재의 <code>(헬라어 agonizomai, 아고니조마이: …)</code>는 <b>원어 단어장</b>에 등록된 단어라면 그리스어 글자로 바뀌어 인쇄됩니다. 본문 칸에는 영문 그대로 둬도 됩니다.</li>
           <li><code>(poieo)</code>처럼 모양이 다른 원어는 단어를 드래그한 뒤 <b>헬라어</b> 버튼을 누르세요. <code>[[poieo]]</code>로 표시되고, 단어장에 있으면 그리스어 글자로 바뀝니다.</li>
@@ -935,9 +935,37 @@ function renderGreekPanel(){
 
 /* ===================== 본문 해석 ===================== */
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+var GK_CH='\u0370-\u03FF\u1F00-\u1FFF\u0590-\u05FF';
+function greekParen(m){
+  var x=function(s){return s.replace(/\*/g,'').trim();};
+  var inner=x(m[2]),ci=inner.search(/[:：]/),head=ci<0?inner:inner.slice(0,ci),tail=ci<0?'':x(inner.slice(ci+1));
+  var isGk=function(w){return new RegExp('['+GK_CH+']').test(w);},
+      isLat=function(w){return /^[A-Za-z\u00C0-\u024F\u1E00-\u1EFF'’\-]+$/.test(w);};
+  var parts=head.trim().split(/(\s*,\s*|\s+)/),hasGk=isGk(head),first=true,out=[{t:'('+m[1]+' ',c:''}];
+  parts.forEach(function(p,i){
+    if(!p) return;
+    if(i%2===1){out.push({t:/,/.test(p)?', ':' ',c:''});return;}
+    var c;
+    if(isGk(p)) c='grk';
+    else if(isLat(p)){
+      if(!hasGk&&first){var w=lookupGreek(p);out.push({t:w,c:isGk(w)?'grk':'it'});first=false;return;}
+      c='it';
+    } else c=state.lang==='ko'?'em':'';
+    first=false;out.push({t:p,c:c});
+  });
+  if(ci>=0){
+    out.push({t:': ',c:''});
+    // 콜론 뒤가 영문 한 단어면 음역(sympatheō), 아니면 뜻
+    out.push({t:tail,c:isLat(tail)?'it':'def'});
+  }
+  out.push({t:')',c:''});
+  return out;
+}
 var PATTERNS=[
-  {re:/\((헬라어|히브리어|아람어)\s+([^\s:：(),]+),?\s+([^:：()]+?)\s*[:：]\s*([^()]*)\)/,
-   f:function(m){var x=function(s){return s.replace(/\*/g,'').trim();};return [{t:'('+m[1]+' ',c:''},{t:lookupGreek(x(m[2])),c:'grk'},{t:' ',c:''},{t:x(m[3]),c:'em'},{t:': ',c:''},{t:x(m[4]),c:'def'},{t:')',c:''}];}},
+  /* 괄호 안 원어 표기는 모양이 여러 가지라 글자 종류로 나눠 꾸밈:
+     (헬라어 δέησις 데에시스: 간청, 요청) / (헬라어 συμπαθέω 쉼파데오: sympatheō)
+     (헬라어 μετριοπαθέω 메트리오파데오, metriopatheō) / (헬라어 agonizomai, 아고니조마이: …) */
+  {re:/\((헬라어|히브리어|아람어)\s+([^()]+)\)/, f:greekParen},
   {re:/\((Greek|Gr\.|Hebrew|Heb\.|Aramaic)\s+([^:()]+?)\s*:\s*([^()]*)\)/i,
    f:function(m){var x=function(s){return s.replace(/\*/g,'').trim();};return [{t:'('+m[1]+' ',c:''},{t:x(m[2]),c:'it'},{t:': ',c:''},{t:x(m[3]),c:'def'},{t:')',c:''}];}},
   /* 헬라어 συμπαθέω(쉼파데오, sympatheō) / 헬라어 ἔρημος(에레모스) 모양 */
@@ -961,7 +989,7 @@ var PATTERNS=[
 var NB='\u00A0';
 function glueRefs(t){
   t=t.replace(/(^|[\s(“"])([1-3])\s+([A-Z][a-z]+)/g,function(m,a,n,w){return a+n+NB+w;});
-  t=t.replace(/([가-힣A-Za-z]+\.?)\s+(\d+:\d+(?:\s?[–\-,]\s?\d+(?::\d+)?)*[ab]?)(\s+참조)?/g,function(m,bk,num,see){
+  t=t.replace(/([가-힣A-Za-z]+\.?)\s+(\d+:\d+[ab]?(?:\s?[–\-,;]\s?\d+(?::\d+)?[ab]?)*)(\s+참조)?/g,function(m,bk,num,see){
     return bk+NB+num+(see?NB+see.trim():'');
   });
   return t;
@@ -1012,7 +1040,7 @@ function splitQuote(line){
   var m=/^(.*[”"“’＂」』])\s*\(([^”"“＂()]*\d[^”"“＂()]*)\)\.?$/.exec(line);
   if(m&&m[2].length<=40) return {text:m[1],ref:m[2].trim()+'.'};
   m=/^(.*[”"“’＂」』])\s+([^”"“＂]*\d[^”"“＂]*)$/.exec(line);
-  if(m&&m[2].length<=40) return {text:m[1],ref:m[2]};
+  if(m&&m[2].length<=40) return {text:m[1],ref:m[2].replace(/\s+$/,'').replace(/([\dab])$/,'$1.')};
   return {text:line,ref:''};
 }
 /* 구절의 상·하를 a·b로: 마태복음 7:15하 → 마태복음 7:15b */
@@ -1224,10 +1252,10 @@ var BOOKS={'창':'창세기','출':'출애굽기','레':'레위기','민':'민�
 var BOOK_KEYS=Object.keys(BOOKS).sort(function(a,b){return b.length-a.length;}).join('|');
 /* 한글 성경 약어를 전체 이름으로: 마 7:15하 → 마태복음 7:15b */
 function expandKoRefs(text){
-  var re=new RegExp('(^|[\\s(“”"\'.,])('+BOOK_KEYS+')\\s?(\\d+:\\d+(?:[–\\-,]\\s?\\d+(?::\\d+)?)*)([하상])?','g');
+  var re=new RegExp('(^|[\\s(“”"\'.,])('+BOOK_KEYS+')\\s?(\\d+:\\d+(?:\\s?[–\\-,;]\\s?\\d+(?::\\d+)?)*)([하상])?','g');
   return text.replace(re,function(all,pre,bk,num,part){return pre+BOOKS[bk]+' '+num+(part==='하'?'b':part==='상'?'a':'');});
 }
-var REF_RE='\\(?((?:[1-3]\\s?)?[A-Za-z가-힣]+\\.?\\s?\\d+:\\d+(?:[–\\-]\\d+(?::\\d+)?)?[a-z하상]?)\\)?\\.?';
+var REF_RE='\\(?((?:[1-3]\\s?)?[A-Za-z가-힣]+\\.?\\s?\\d+:\\d+[ab하상]?(?:\\s?[–\\-,;]\\s?(?:(?:[1-3]\\s?)?[A-Za-z가-힣]+\\.?\\s)?\\d+(?::\\d+)?[ab하상]?)*(?:\\s참조)?)\\)?\\.?';
 /* 긴 문단 안에서 “말씀.” 구절. 을 찾아 인용 칸으로 빼기 */
 function splitParagraph(text){
   var out=[],re=new RegExp('[“"„＂]([^“”"＂]+)[”"＂]\\s*'+REF_RE,'g'),m,last=0;
